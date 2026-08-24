@@ -197,13 +197,13 @@ export default function Reports() {
               <div className="label">{monthLabel.toUpperCase()} SAVINGS</div>
               <div className="value">{money(data.totals.income - data.totals.expense)}</div>
             </div>
+            <div className="stat total" style={{ background: (data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0)) < 0 ? "var(--danger)" : undefined }}>
+              <div className="label">{year} SAVINGS</div>
+              <div className="value">{money(data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0))}</div>
+            </div>
             <div className="stat">
               <div className="label">Transactions</div>
               <div className="value">{data.transactionCount ?? 0}</div>
-            </div>
-            <div className="stat">
-              <div className="label">Categories Used</div>
-              <div className="value">{catCount}</div>
             </div>
           </div>
 

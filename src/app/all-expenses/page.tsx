@@ -40,6 +40,7 @@ export default function AllExpenses() {
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [catFilter, setCatFilter] = useState('');
   const [subFilter, setSubFilter] = useState('');
+  const [merchantFilter, setMerchantFilter] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function AllExpenses() {
 
   let filtered = catFilter ? rows.filter((r) => r.category === catFilter) : rows;
   if (subFilter) filtered = filtered.filter((r) => (r.subcategory || '-') === subFilter);
+  if (merchantFilter) filtered = filtered.filter((r) => (r.merchant || '-') === merchantFilter);
   const expenseRows = filtered.filter((r) => r.categoryDirection === 'expense');
   const incomeRows = filtered.filter((r) => r.categoryDirection === 'income');
   // Net totals: expense-category items add (positive), refunds/credits subtract (negative)
@@ -108,6 +110,13 @@ export default function AllExpenses() {
             <select value={subFilter} onChange={(e) => setSubFilter(e.target.value)} style={{ width: 'auto' }}>
               <option value="">All subcategories</option>
               {[...new Set(rows.filter((r) => !catFilter || r.category === catFilter).map((r) => r.subcategory || '-'))].sort().map((sub) => <option key={sub} value={sub}>{sub}</option>)}
+            </select>
+          </div>
+          <div>
+            <label>Merchant</label>
+            <select value={merchantFilter} onChange={(e) => setMerchantFilter(e.target.value)} style={{ width: 'auto' }}>
+              <option value="">All merchants</option>
+              {[...new Set(rows.map((r) => r.merchant || '-'))].sort().map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
         </div>
