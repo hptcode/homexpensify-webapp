@@ -8,6 +8,7 @@ type BudgetStatus = {
   id: string;
   kind: 'limit' | 'goal';
   period: 'monthly' | 'yearly';
+  categoryId: string | null;
   category: string | null;
   label: string;
   periodLabel: string;
@@ -223,8 +224,18 @@ export default function Reports() {
                 const isGoal = b.kind === 'goal';
                 const isYearly = b.period === 'yearly';
                 const name = isGoal ? `${isYearly ? 'Yearly' : 'Monthly'} savings goal` : b.category;
-                const bad = b.over || b.behind || (isYearly && !b.onTrack && !isGoal);
-                const barColor = isGoal ? (b.behind ? 'var(--danger)' : 'var(--secondary)') : isYearly ? (b.onTrack ? 'var(--primary)' : '#e0a700') : (b.over ? 'var(--danger)' : b.pct > 80 ? '#e0a700' : 'var(--primary)');
+                const bad = b.over || b.behind;
+                const barColor = isGoal ? (b.behind ? 'var(--danger)' : 'var(--secondary)') : (b.over ? 'var(--danger)' : b.pct > 100 ? 'var(--danger)' : (b.pct > 80 ? '#e0a700' : 'var(--primary)'));
+                // For yearly limit budgets: show monthly average, compare current month's category spend.
+                let monthlyAvg: number | null = null;
+                let monthSpend: number | null = null;
+                let monthOverAvg = false;
+                if (!isGoal && isYearly && b.categoryId) {
+                  monthlyAvg = Math.round(b.amount / 12);
+                  const catRow = data?.byCategory.find((c) => c.categoryId === b.categoryId);
+                  monthSpend = catRow ? Math.max(0, catRow.amount) : 0;
+                  monthOverAvg = monthSpend > monthlyAvg;
+                }
                 return (
                   <div key={b.id} style={{ marginTop: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16 }}>
@@ -235,13 +246,10 @@ export default function Reports() {
                     </div>
                     <div style={{ position: 'relative', background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 10, marginTop: 4, overflow: 'hidden' }}>
                       <div style={{ width: `${Math.min(100, b.pct)}%`, height: '100%', background: barColor, borderRadius: 6 }} />
-                      {isYearly && b.pacePct && b.pacePct > 0 && b.pacePct < 100 && (
-                        <div style={{ position: 'absolute', left: `${b.pacePct}%`, top: -2, bottom: -2, width: 2, background: 'var(--text-primary)', opacity: 0.5 }} title={`Pace: ${b.pacePct}%`} />
-                      )}
                     </div>
-                    {isYearly && b.monthsElapsed && (
-                      <div style={{ fontSize: 14, color: b.onTrack ? 'var(--primary)' : 'var(--warning)', marginTop: 3 }}>
-                        YTD through {monthLabel} · {b.monthsElapsed}/{b.totalMonths} months · pace {b.pacePct}% · {b.onTrack ? 'on track ✓' : 'above pace ⚠'}
+                    {!isGoal && isYearly && monthlyAvg !== null && (
+                      <div style={{ fontSize: 14, color: monthOverAvg ? 'var(--danger)' : 'var(--text-secondary)', marginTop: 3 }}>
+                        avg/month {money(monthlyAvg)}{monthSpend !== null && <> · this month {money(monthSpend)}{monthOverAvg ? ' · over avg ⚠' : ''}</>}
                       </div>
                     )}
                   </div>
