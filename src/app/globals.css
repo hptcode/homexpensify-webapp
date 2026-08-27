@@ -63,8 +63,8 @@ body {
 .chart h3 { color: var(--text-secondary); margin-top:0; font-size:20px; line-height:1.35; }
 .chart h3 .muted { font-size:15px; font-weight:600; color:var(--text-primary); margin-left:4px; }
 .bar-row { display:flex; align-items:center; gap:10px; margin:7px 0; }
-.bar-label { width:170px; color: var(--text-secondary); font-size:15px;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar-label { width:200px; color: var(--text-secondary); font-size:15px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .bar-track { flex:1; background: var(--bg-input); border-radius:6px; height:18px; overflow:hidden; }
 .bar-fill { display:block; height:100%; background: var(--primary); }
 .bar-fill.sec { background: var(--secondary); }
@@ -120,7 +120,7 @@ a { color: var(--secondary); }
   .card, .card.wide, .chart { padding:1rem; }
   .chart h3 { font-size:18px; }
   .chart h3 .muted { display:inline; font-size:14px; }
-  .bar-label { width:112px; font-size:14px; }
+  .bar-label { width:140px; font-size:14px; }
   .bar-val { width:88px; font-size:14px; }
   .bar-row { gap:7px; }
   .exp-table { display:block; overflow-x:auto; white-space:nowrap; }

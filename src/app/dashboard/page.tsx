@@ -61,7 +61,7 @@ function Bar({ label, amount, max, colorClass, credit }: { label: string; amount
       <span className="bar-label"><span style={{ color: signColor, marginRight: 4, fontWeight: 700 }}>{sign}</span>{label}</span>
       <span className="bar-track">
         <span className={cls} style={{ width: Math.max(pct, 2) + '%' }}>
-          <span className="tip">{money(amount)}</span>
+          <span className="tip">{label}: {money(amount)}</span>
         </span>
       </span>
       <span className="bar-val">{money(amount)}</span>
