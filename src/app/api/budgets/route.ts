@@ -10,8 +10,11 @@ async function ensureBudgetSubcategoryColumn() {
   if (_subMigrated) return;
   try {
     await db.execute(sql`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS subcategory_id uuid REFERENCES subcategories(id) ON DELETE CASCADE`);
-    try { await db.execute(sql`DROP INDEX IF EXISTS budgets_household_category_subcategory`); } catch {}
+    // Remove the legacy UNIQUE CONSTRAINT on (household_id, category_id) which blocked
+    // multiple budgets per category. It was created as a named CONSTRAINT, not an index.
+    try { await db.execute(sql`ALTER TABLE budgets DROP CONSTRAINT IF EXISTS budgets_household_category`); } catch (e) { console.error('[budgets] drop legacy constraint:', e instanceof Error ? e.message : String(e)); }
     try { await db.execute(sql`DROP INDEX IF EXISTS budgets_household_category`); } catch {}
+    try { await db.execute(sql`DROP INDEX IF EXISTS budgets_household_category_subcategory`); } catch {}
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS budgets_household_category_subcategory ON budgets (household_id, category_id, subcategory_id)`);
     _subMigrated = true;
     console.log('[budgets] budget subcategory column ensured');
