@@ -26,6 +26,9 @@ export async function GET(req: Request) {
     .from(subcategories).where(and(eq(subcategories.householdId, hid), isNull(subcategories.deletedAt)));
   const catDir = new Map(cats.map((c) => [c.id, c.direction]));
   const catName = new Map(cats.map((c) => [c.id, c.name]));
+  const subRows = await db.select({ id: subcategories.id, name: subcategories.name, categoryId: subcategories.categoryId }).from(subcategories).where(and(eq(subcategories.householdId, hid), isNull(subcategories.deletedAt)));
+  const subName = new Map(subRows.map((x) => [x.id, x.name]));
+  const subCategory = new Map(subRows.map((x) => [x.id, x.categoryId]));
   const subDir = new Map(subs.map((s) => [s.id, s.direction]));
 
   const now = new Date();
@@ -64,6 +67,8 @@ export async function GET(req: Request) {
   // Per-category spend, per selected month and YTD-through-selected-month.
   const catMonthSpend = new Map<string, number>();
   const catYtdSpend = new Map<string, number>();
+  const subMonthSpend = new Map<string, number>();
+  const subYtdSpend = new Map<string, number>();
   // Net cash flow (from lines) per selected month and YTD-through-selected.
   let monthNet = 0, ytdNet = 0;
   for (const l of lines) {
@@ -73,6 +78,10 @@ export async function GET(req: Request) {
     const signed = d === 'income' ? -l.amount : l.amount;
     catMonthSpend.set(l.categoryId, (catMonthSpend.get(l.categoryId) ?? 0) + (isSelMonth(t) ? signed : 0));
     catYtdSpend.set(l.categoryId, (catYtdSpend.get(l.categoryId) ?? 0) + (isThroughSelMonth(t) ? signed : 0));
+    if (l.subcategoryId) {
+      subMonthSpend.set(l.subcategoryId, (subMonthSpend.get(l.subcategoryId) ?? 0) + (isSelMonth(t) ? signed : 0));
+      subYtdSpend.set(l.subcategoryId, (subYtdSpend.get(l.subcategoryId) ?? 0) + (isThroughSelMonth(t) ? signed : 0));
+    }
     // Net cash flow: income adds (+amount), expense subtracts (-amount). Flipped from spend sign.
     if (isSelMonth(t)) monthNet += -signed;
     if (isThroughSelMonth(t)) ytdNet += -signed;
@@ -94,7 +103,9 @@ export async function GET(req: Request) {
         label = 'Saved';
         periodLabel = isYearly ? `YTD through ${monthLabel}` : monthLabel;
       } else {
-        const spend = isYearly ? (catYtdSpend.get(b.categoryId!) ?? 0) : (catMonthSpend.get(b.categoryId!) ?? 0);
+        const spend = b.subcategoryId
+          ? (isYearly ? (subYtdSpend.get(b.subcategoryId) ?? 0) : (subMonthSpend.get(b.subcategoryId) ?? 0))
+          : (isYearly ? (catYtdSpend.get(b.categoryId!) ?? 0) : (catMonthSpend.get(b.categoryId!) ?? 0));
         actual = spend;
         label = 'Spent';
         periodLabel = isYearly ? `YTD through ${monthLabel}` : monthLabel;
@@ -115,7 +126,9 @@ export async function GET(req: Request) {
         kind: b.kind,
         period: b.period,
         categoryId: b.categoryId ?? null,
+        subcategoryId: b.subcategoryId ?? null,
         category: b.categoryId ? (catName.get(b.categoryId) ?? '(unknown)') : null,
+        subcategory: b.subcategoryId ? (subName.get(b.subcategoryId) ?? '(unknown)') : null,
         categoryDirection: b.categoryId ? (catDir.get(b.categoryId) ?? 'expense') : null,
         label,
         periodLabel,
@@ -147,7 +160,7 @@ export async function POST(req: Request) {
   const ctx = await getAuthContext(req);
   if (!ctx) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   if (ctx.role !== 'owner') return NextResponse.json({ error: 'only the household owner can set budgets' }, { status: 403 });
-  const { categoryId, kind, period, amount } = await req.json();
+  const { categoryId, subcategoryId, kind, period, amount } = await req.json();
   const k = kind === 'goal' ? 'goal' : 'limit';
   const p = period === 'yearly' ? 'yearly' : 'monthly';
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 0) {
@@ -155,6 +168,10 @@ export async function POST(req: Request) {
   }
   if (k === 'limit') {
     if (!categoryId) return NextResponse.json({ error: 'a category is required for a spending limit' }, { status: 400 });
+    if (subcategoryId) {
+      const [sub] = await db.select({ id: subcategories.id }).from(subcategories).where(and(eq(subcategories.id, subcategoryId), eq(subcategories.categoryId, categoryId), eq(subcategories.householdId, ctx.householdId), isNull(subcategories.deletedAt))).limit(1);
+      if (!sub) return NextResponse.json({ error: 'subcategory not found for this category' }, { status: 404 });
+    }
     const [cat] = await db.select({ id: categories.id }).from(categories)
       .where(and(eq(categories.id, categoryId), eq(categories.householdId, ctx.householdId), isNull(categories.deletedAt)))
       .limit(1);
@@ -163,13 +180,13 @@ export async function POST(req: Request) {
 
   if (k === 'limit') {
     const existing = await db.select({ id: budgets.id }).from(budgets)
-      .where(and(eq(budgets.householdId, ctx.householdId), eq(budgets.categoryId, categoryId))).limit(1);
+      .where(and(eq(budgets.householdId, ctx.householdId), eq(budgets.categoryId, categoryId), subcategoryId ? eq(budgets.subcategoryId, subcategoryId) : isNull(budgets.subcategoryId))).limit(1);
     if (existing.length) {
       const [u] = await db.update(budgets).set({ amount, period: p, updatedAt: new Date() })
         .where(eq(budgets.id, existing[0].id)).returning();
       return NextResponse.json({ budget: u });
     }
-    const [ins] = await db.insert(budgets).values({ householdId: ctx.householdId, categoryId, kind: k, period: p, amount }).returning();
+    const [ins] = await db.insert(budgets).values({ householdId: ctx.householdId, categoryId, subcategoryId: subcategoryId || null, kind: k, period: p, amount }).returning();
     return NextResponse.json({ budget: ins });
   } else {
     // goal: one per household is fine; allow multiple but upsert on (period) for simplicity

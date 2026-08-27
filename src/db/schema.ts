@@ -141,6 +141,8 @@ export const budgets = pgTable('budgets', {
     .notNull().references(() => households.id, { onDelete: 'cascade' }),
   categoryId: uuid('category_id')
     .references(() => categories.id, { onDelete: 'cascade' }), // null for savings goals
+  subcategoryId: uuid('subcategory_id')
+    .references(() => subcategories.id, { onDelete: 'cascade' }), // optional subcategory limit
   kind: budgetKind('kind').notNull().default('limit'),
   period: budgetPeriod('period').notNull().default('monthly'),
   amount: integer('amount').notNull(), // minor units (monthly or yearly figure)
@@ -148,7 +150,7 @@ export const budgets = pgTable('budgets', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   byHousehold: index('budgets_by_household').on(t.householdId),
-  uniqueCategory: unique('budgets_household_category').on(t.householdId, t.categoryId),
+  uniqueCategory: unique('budgets_household_category').on(t.householdId, t.categoryId, t.subcategoryId),
 }));
 
 /* -------------------------- transactions -------------------------- */

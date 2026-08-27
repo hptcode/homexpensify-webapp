@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 
 type Cat = { id: string; name: string; direction: 'income' | 'expense' };
+type Sub = { id: string; name: string; categoryId: string };
 type Budget = {
   id: string;
   kind: 'limit' | 'goal';
   period: 'monthly' | 'yearly';
   categoryId: string | null;
+  subcategoryId: string | null;
   category: string | null;
+  subcategory: string | null;
   label: string;
   amount: number;
   actual: number;
@@ -28,6 +31,7 @@ function money(cents: number): string {
 
 export default function Budgets() {
   const [cats, setCats] = useState<Cat[]>([]);
+  const [subs, setSubs] = useState<Sub[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [role, setRole] = useState('');
   const [error, setError] = useState('');
@@ -36,6 +40,7 @@ export default function Budgets() {
   const [kind, setKind] = useState<'limit' | 'goal'>('limit');
   const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [catId, setCatId] = useState('');
+  const [subId, setSubId] = useState('');
   const [amount, setAmount] = useState('');
   // Selected comparison month (YYYY-MM in PDT). Empty = current month.
   const now = new Date();
@@ -68,6 +73,7 @@ export default function Budgets() {
       setCats([...(c.categories ?? [])]
         .sort((a: any, b: any) => dirRank(a.direction) - dirRank(b.direction) || a.name.localeCompare(b.name))
         .map((x: any) => ({ id: x.id, name: x.name, direction: x.direction })));
+      setSubs((c.categories ?? []).flatMap((x: any) => (x.subcategories ?? []).map((sub: any) => ({ id: sub.id, name: sub.name, categoryId: x.id }))));
       const q = mKey ? `/api/budgets?month=${mKey}` : '/api/budgets';
       const b = await (await fetch(q)).json();
       setBudgets(b.budgets ?? []);
@@ -91,11 +97,12 @@ export default function Budgets() {
     const res = await fetch('/api/budgets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categoryId: kind === 'limit' ? catId : null, kind, period, amount: cents }),
+      body: JSON.stringify({ categoryId: kind === 'limit' ? catId : null, subcategoryId: kind === 'limit' ? (subId || null) : null, kind, period, amount: cents }),
     });
     if (res.ok) {
       setAmount('');
       setCatId('');
+      setSubId('');
       await load();
     } else {
       const d = await res.json().catch(() => ({}));
@@ -109,7 +116,9 @@ export default function Budgets() {
   }
 
   const used = new Set(budgets.filter((b) => b.kind === 'limit' && b.categoryId).map((b) => b.categoryId));
-  const available = cats.filter((c) => !used.has(c.id) && c.direction === 'expense');
+  const available = cats.filter((c) => c.direction === 'expense');
+  const usedSub = new Set(budgets.filter((b) => b.kind === 'limit' && b.categoryId && b.subcategoryId).map((b) => b.subcategoryId));
+  const availableSubs = subs.filter((sub) => sub.categoryId === catId && !usedSub.has(sub.id));
 
   return (
     <div>
@@ -143,7 +152,7 @@ export default function Budgets() {
                 {budgets.map((b) => (
                   <li key={b.id} style={{ marginBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <strong>{b.kind === 'goal' ? `${b.period === 'yearly' ? 'Yearly' : 'Monthly'} savings goal` : b.category}</strong>
+                      <strong>{b.kind === 'goal' ? `${b.period === 'yearly' ? 'Yearly' : 'Monthly'} savings goal` : (b.subcategory ? `${b.category} → ${b.subcategory}` : b.category)}</strong>
                       <span className="muted" style={{ fontSize: 14 }}>{b.label}: {money(b.actual)} / {money(b.amount)}</span>
                     </div>
                     <div style={{ fontSize: 13, color: (b.over || b.behind) ? 'var(--danger)' : 'var(--text-secondary)', marginTop: 4 }}>
@@ -162,7 +171,7 @@ export default function Budgets() {
 
         {budgets.map((b) => {
           const isGoal = b.kind === 'goal';
-          const title = isGoal ? `${b.period === 'yearly' ? 'Yearly' : 'Monthly'} savings goal` : `${b.category}`;
+          const title = isGoal ? `${b.period === 'yearly' ? 'Yearly' : 'Monthly'} savings goal` : (b.subcategory ? `${b.category} → ${b.subcategory}` : `${b.category}`);
           const barColor = isGoal ? (b.behind ? '#e0a700' : 'var(--primary)') : (b.over ? 'var(--danger)' : b.pct > 80 ? '#e0a700' : 'var(--primary)');
           const statusText = isGoal
             ? (b.behind ? `Behind by ${money(-b.remaining)}` : `On track (${money(b.actual)} saved)`)
@@ -207,6 +216,12 @@ export default function Budgets() {
               <select value={catId} onChange={(e) => setCatId(e.target.value)} style={{ flex: 1, minWidth: 200 }}>
                 <option value="">Select a category</option>
                 {available.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+            {kind === 'limit' && catId && availableSubs.length > 0 && (
+              <select value={subId} onChange={(e) => setSubId(e.target.value)} style={{ flex: 1, minWidth: 200 }}>
+                <option value="">Whole category (optional subcategory)</option>
+                {availableSubs.map((sub) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
               </select>
             )}
             <input

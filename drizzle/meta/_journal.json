@@ -78,6 +78,13 @@
       "when": 1788200000000,
       "tag": "0010_add_frequency_values",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770000000000,
+      "tag": "0011_budget_subcategory",
+      "breakpoints": true
     }
   ]
 }

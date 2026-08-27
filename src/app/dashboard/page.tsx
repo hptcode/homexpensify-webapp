@@ -9,7 +9,9 @@ type BudgetStatus = {
   kind: 'limit' | 'goal';
   period: 'monthly' | 'yearly';
   categoryId: string | null;
+  subcategoryId: string | null;
   category: string | null;
+  subcategory: string | null;
   label: string;
   periodLabel: string;
   amount: number;
@@ -223,7 +225,7 @@ export default function Reports() {
               const renderBudget = (b: BudgetStatus) => {
                 const isGoal = b.kind === 'goal';
                 const isYearly = b.period === 'yearly';
-                const name = isGoal ? `${isYearly ? 'Yearly' : 'Monthly'} savings goal` : b.category;
+                const name = isGoal ? `${isYearly ? 'Yearly' : 'Monthly'} savings goal` : (b.subcategory ? `${b.category} → ${b.subcategory}` : b.category);
                 const bad = b.over || b.behind;
                 const barColor = isGoal ? (b.behind ? 'var(--danger)' : 'var(--secondary)') : (b.over ? 'var(--danger)' : b.pct > 100 ? 'var(--danger)' : (b.pct > 80 ? '#e0a700' : 'var(--primary)'));
                 // For yearly limit budgets: show monthly average, compare current month's category spend.
