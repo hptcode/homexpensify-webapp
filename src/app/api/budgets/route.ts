@@ -118,6 +118,7 @@ export async function GET(req: Request) {
       let actual: number;
       let label: string;
       let periodLabel: string;
+      let monthSpend: number = 0;
       if (b.kind === 'goal') {
         actual = isYearly ? ytdNet : monthNet;
         label = 'Saved';
@@ -129,6 +130,10 @@ export async function GET(req: Request) {
         actual = spend;
         label = 'Spent';
         periodLabel = isYearly ? `YTD through ${monthLabel}` : monthLabel;
+        // current-month spend for that exact budget target (category or subcategory)
+        monthSpend = isYearly
+          ? (b.subcategoryId ? (subMonthSpend.get(b.subcategoryId) ?? 0) : (catMonthSpend.get(b.categoryId!) ?? 0))
+          : actual;
       }
       // For limits: pct of amount used (over = bad). For goals: pct of goal reached (under = bad).
       const denom = b.amount > 0 ? b.amount : 1;
@@ -155,6 +160,7 @@ export async function GET(req: Request) {
         selectedMonth: selected,
         amount: b.amount,
         actual,
+        monthSpend,
         remaining,
         pct,
         over: b.kind === 'limit' ? actual > b.amount : false,

@@ -16,6 +16,7 @@ type BudgetStatus = {
   periodLabel: string;
   amount: number;
   actual: number;
+  monthSpend: number;
   pct: number;
   over: boolean;
   behind: boolean;
@@ -228,14 +229,13 @@ export default function Reports() {
                 const name = isGoal ? `${isYearly ? 'Yearly' : 'Monthly'} savings goal` : (b.subcategory ? `${b.category} → ${b.subcategory}` : b.category);
                 const bad = b.over || b.behind;
                 const barColor = isGoal ? (b.behind ? 'var(--danger)' : 'var(--secondary)') : (b.over ? 'var(--danger)' : b.pct > 100 ? 'var(--danger)' : (b.pct > 80 ? '#e0a700' : 'var(--primary)'));
-                // For yearly limit budgets: show monthly average, compare current month's category spend.
+                // For yearly limit budgets: show monthly average, compare current month's spend.
                 let monthlyAvg: number | null = null;
                 let monthSpend: number | null = null;
                 let monthOverAvg = false;
-                if (!isGoal && isYearly && b.categoryId) {
+                if (!isGoal && isYearly) {
                   monthlyAvg = Math.round(b.amount / 12);
-                  const catRow = data?.byCategory.find((c) => c.categoryId === b.categoryId);
-                  monthSpend = catRow ? Math.max(0, catRow.amount) : 0;
+                  monthSpend = Math.max(0, b.monthSpend ?? 0);
                   monthOverAvg = monthSpend > monthlyAvg;
                 }
                 return (
