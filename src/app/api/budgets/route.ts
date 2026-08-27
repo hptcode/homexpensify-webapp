@@ -3,6 +3,22 @@ import { and, eq, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { budgets, categories, subcategories, transactions, transactionLines } from '@/db/schema';
 import { getAuthContext } from '@/auth/current-user';
+import { sql } from 'drizzle-orm';
+
+let _subMigrated = false;
+async function ensureBudgetSubcategoryColumn() {
+  if (_subMigrated) return;
+  try {
+    await db.execute(sql`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS subcategory_id uuid REFERENCES subcategories(id) ON DELETE CASCADE`);
+    try { await db.execute(sql`DROP INDEX IF EXISTS budgets_household_category_subcategory`); } catch {}
+    try { await db.execute(sql`DROP INDEX IF EXISTS budgets_household_category`); } catch {}
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS budgets_household_category_subcategory ON budgets (household_id, category_id, subcategory_id)`);
+    _subMigrated = true;
+    console.log('[budgets] budget subcategory column ensured');
+  } catch (e) {
+    console.error('[budgets] could not add subcategory column:', e instanceof Error ? e.message : String(e));
+  }
+}
 
 // Budgets are either:
 //  - kind='limit' + categoryId: compare category spend in the period vs amount
@@ -18,6 +34,7 @@ function pdtParts(now: Date) {
 export async function GET(req: Request) {
   const ctx = await getAuthContext(req);
   if (!ctx) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  await ensureBudgetSubcategoryColumn();
   const hid = ctx.householdId;
 
   const cats = await db.select({ id: categories.id, name: categories.name, direction: categories.direction })
@@ -160,6 +177,7 @@ export async function POST(req: Request) {
   const ctx = await getAuthContext(req);
   if (!ctx) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   if (ctx.role !== 'owner') return NextResponse.json({ error: 'only the household owner can set budgets' }, { status: 403 });
+  await ensureBudgetSubcategoryColumn();
   const { categoryId, subcategoryId, kind, period, amount } = await req.json();
   const k = kind === 'goal' ? 'goal' : 'limit';
   const p = period === 'yearly' ? 'yearly' : 'monthly';
