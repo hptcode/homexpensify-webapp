@@ -107,7 +107,7 @@ export async function GET(req: Request) {
     if (isThroughSelMonth(t)) ytdNet += -signed;
   }
 
-  const monthLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'short', year: 'numeric' }).format(new Date(Date.UTC(selY, selM - 1, 1)));
+  const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(new Date(selY, selM - 1, 1, 12, 0, 0));
 
   const rows = await db.select()
     .from(budgets).where(eq(budgets.householdId, hid));
