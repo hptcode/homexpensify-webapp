@@ -213,8 +213,6 @@ export default function Reports() {
             </div>
           </div>
 
-          <p className="muted" style={{ marginTop: 6 }}>▼ = net spend &nbsp;·&nbsp; ▲ = net income/credit (e.g. refunds)</p>
-
           <div className="chart budget-status">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 0 }}>
               <h3 style={{ margin: 0 }}>Budget Status</h3>
