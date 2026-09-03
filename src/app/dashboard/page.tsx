@@ -200,12 +200,12 @@ export default function Reports() {
             <div className="stat total" style={{ background: (data.totals.income - data.totals.expense) < 0 ? "var(--danger)" : undefined }}>
               <div className="label">{monthLabel.toUpperCase()} SAVINGS</div>
               <div className="value">{money(data.totals.income - data.totals.expense)}</div>
-              <div className="stat-caption"><span style={{ color: '#eab308' }}>exp {money(data.totals.expense)}</span>&nbsp;·&nbsp;<span style={{ color: '#86efac' }}>inc {money(data.totals.income)}</span></div>
+              <div className="stat-caption"><span style={{ color: '#ef4444' }}>exp {money(data.totals.expense)}</span>&nbsp;·&nbsp;<span style={{ color: '#16a34a' }}>inc {money(data.totals.income)}</span></div>
             </div>
             <div className="stat total" style={{ background: (data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0)) < 0 ? "var(--danger)" : undefined }}>
               <div className="label">{year} SAVINGS</div>
               <div className="value">{money(data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0))}</div>
-              <div className="stat-caption"><span style={{ color: '#eab308' }}>exp {money(data.yearlyTrend.reduce((s, m) => s + m.expense, 0))}</span>&nbsp;·&nbsp;<span style={{ color: '#86efac' }}>inc {money(data.yearlyTrend.reduce((s, m) => s + m.income, 0))}</span></div>
+              <div className="stat-caption"><span style={{ color: '#ef4444' }}>exp {money(data.yearlyTrend.reduce((s, m) => s + m.expense, 0))}</span>&nbsp;·&nbsp;<span style={{ color: '#16a34a' }}>inc {money(data.yearlyTrend.reduce((s, m) => s + m.income, 0))}</span></div>
             </div>
             <div className="stat">
               <div className="label">Transactions</div>
