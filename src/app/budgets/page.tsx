@@ -47,6 +47,7 @@ export default function Budgets() {
   const curMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [selMonth, setSelMonth] = useState('');
   const [showView, setShowView] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   // Build a list of the last 18 months for the dropdown, newest first (closest -> oldest).
   const monthOptions: string[] = [];
   for (let i = 0; i <= 17; i++) {
@@ -94,6 +95,7 @@ export default function Budgets() {
     const cents = Math.round(parseFloat(amount) * 100);
     if (!Number.isFinite(cents) || cents < 0) { setError('Enter a valid amount (e.g. 500)'); return; }
     if (kind === 'limit' && !catId) { setError('Pick a category'); return; }
+    setBusy(true);
     const res = await fetch('/api/budgets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,8 +105,11 @@ export default function Budgets() {
       setAmount('');
       setCatId('');
       setSubId('');
+      setEditingId(null);
+      setBusy(false);
       await load();
     } else {
+      setBusy(false);
       const d = await res.json().catch(() => ({}));
       setError(d.error || 'Failed to save budget');
     }
@@ -113,6 +118,15 @@ export default function Budgets() {
   async function removeBudget(id: string) {
     await fetch(`/api/budgets?id=${id}`, { method: 'DELETE' });
     await load();
+  }
+
+    function startEdit(b: Budget) {
+    setKind(b.kind);
+    setPeriod(b.period);
+    setCatId(b.categoryId ?? '');
+    setSubId(b.subcategoryId ?? '');
+    setAmount((b.amount / 100).toFixed(2));
+    setEditingId(b.id);
   }
 
   const used = new Set(budgets.filter((b) => b.kind === 'limit' && b.categoryId).map((b) => b.categoryId));
@@ -193,6 +207,7 @@ export default function Budgets() {
                 <span style={{ color: (b.over || b.behind) ? 'var(--danger)' : 'var(--text-secondary)' }}>
                   {statusText} · {b.pct}% · {b.periodLabel}{b.accrualPerMonth > 0 ? ` · ≈ ${money(b.accrualPerMonth)}/mo` : ''}
                 </span>
+                <button className="btn secondary" style={{ width: 'auto', padding: '4px 12px' }} onClick={() => startEdit(b)}>Edit</button>
                 <button className="btn secondary" style={{ width: 'auto', padding: '4px 12px' }} onClick={() => removeBudget(b.id)}>Remove</button>
               </div>
             </div>
@@ -201,7 +216,7 @@ export default function Budgets() {
 
         {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
 
-        <h3 style={{ marginTop: 22 }}>Add a Budget</h3>
+        <h3 style={{ marginTop: 22 }}>{editingId ? 'Edit Budget' : 'Add a Budget'}</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select value={kind} onChange={(e) => setKind(e.target.value as 'limit' | 'goal')} style={{ width: 'auto' }}>
@@ -236,7 +251,8 @@ export default function Budgets() {
             />
           </div>
           <div>
-            <button className="btn" style={{ width: 'auto', padding: '10px 18px' }} onClick={addBudget}>Add Budget</button>
+            <button className="btn" style={{ width: 'auto', padding: '10px 18px' }} onClick={addBudget}>{editingId ? 'Save Changes' : 'Add Budget'}</button>
+          {editingId && <button className="btn secondary" style={{ width: 'auto', padding: '10px 18px' }} onClick={() => { setEditingId(null); setAmount(''); setCatId(''); setSubId(''); setKind('limit'); setPeriod('monthly'); }}>Cancel</button>}
           </div>
         </div>
       </div>
