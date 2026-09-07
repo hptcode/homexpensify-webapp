@@ -208,8 +208,8 @@ export default function Reports() {
               <div className="stat-caption"><span style={{ color: '#ef4444' }}>exp {money(data.yearlyTrend.reduce((s, m) => s + m.expense, 0))}</span>&nbsp;·&nbsp;<span style={{ color: '#16a34a' }}>inc {money(data.yearlyTrend.reduce((s, m) => s + m.income, 0))}</span></div>
             </div>
             <div className="stat">
-              <div className="label">Transactions</div>
-              <div className="value">{data.transactionCount ?? 0}</div>
+              <div className="label">Monthly Budget Total</div>
+              <div className="value">{money(budgetData.filter((b) => b.kind === 'limit' && !b.subcategoryId).reduce((sum, b) => sum + (b.period === 'yearly' ? Math.round(b.amount / 12) : b.amount), 0))}</div>
             </div>
           </div>
 

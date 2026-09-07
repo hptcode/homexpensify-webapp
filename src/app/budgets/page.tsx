@@ -216,6 +216,25 @@ export default function Budgets() {
           );
         })}
 
+        {(() => {
+          // Projected monthly expense = sum of category-level spending limits
+          // (yearly limits contribute amount/12). Excludes subcategory budgets and savings goals.
+          const monthlyTotal = budgets
+            .filter((x) => x.kind === 'limit' && !x.subcategoryId)
+            .reduce((sum, x) => sum + (x.period === 'yearly' ? Math.round(x.amount / 12) : x.amount), 0);
+          return (
+            <div style={{ marginTop: 14, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-card)' }}>
+              <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <strong>Monthly Projected Expenses</strong>
+                <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>{money(monthlyTotal)}</span>
+              </span>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                Total of all category budgets (yearly ÷ 12), excluding subcategory budgets and savings goals.
+              </div>
+            </div>
+          );
+        })()}
+
         {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
 
         <h3 style={{ marginTop: 22 }}>{editingId ? 'Edit Budget' : 'Add a Budget'}</h3>
