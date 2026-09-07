@@ -207,8 +207,10 @@ export default function Budgets() {
                 <span style={{ color: (b.over || b.behind) ? 'var(--danger)' : 'var(--text-secondary)' }}>
                   {statusText} · {b.pct}% · {b.periodLabel}{b.accrualPerMonth > 0 ? ` · ≈ ${money(b.accrualPerMonth)}/mo` : ''}
                 </span>
-                <button className="btn secondary" style={{ width: 'auto', padding: '4px 12px' }} onClick={() => startEdit(b)}>Edit</button>
-                <button className="btn secondary" style={{ width: 'auto', padding: '4px 12px' }} onClick={() => removeBudget(b.id)}>Remove</button>
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button className="btn secondary" style={{ width: 'auto', padding: '4px 12px' }} onClick={() => startEdit(b)}>Edit</button>
+                  <button className="btn secondary" style={{ width: 'auto', padding: '4px 12px' }} onClick={() => removeBudget(b.id)}>Remove</button>
+                </span>
               </div>
             </div>
           );
