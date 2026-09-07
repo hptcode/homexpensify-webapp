@@ -2,6 +2,7 @@
 // (monthly total, counts, monthly+ yearly bar charts; no weekly).
 'use client';
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { partsInTimezone } from '@/lib/timezone';
 
 type BudgetStatus = {
@@ -50,6 +51,49 @@ function money(cents: number): string {
   const [whole, dec] = amt.toFixed(2).split('.');
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return sign + '$' + grouped + '.' + dec;
+}
+
+
+// --- Sample-style stat card SVG icons (thin outline in currentColor) ---
+const svgWrap = (body: ReactNode) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{body}</svg>
+);
+const PiggyIcon = () => svgWrap(<><ellipse cx="12" cy="15" rx="7" ry="5.5" /><path d="M7.5 10 L11 8.5 L11 12 Z" /><circle cx="18" cy="13" r="2.2" /><path d="M16 19 q2 3 3 1 5 3" /></>);
+const CalendarIcon = () => svgWrap(<><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M8 8.5 h8 M8 11.5 h8 M8 14.5 h8" /></>);
+const WalletIcon = () => svgWrap(<><rect x="4" y="5" width="16" height="13" rx="2" /><rect x="15" y="5" width="7" height="13" rx="2" /></>);
+const TargetIcon = () => svgWrap(<><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="M3 12 H21 M12 3 V21" /></>);
+const ArrowUpIcon = () => svgWrap(<path d="M7 19 L12 12 L17 19" />);
+const ArrowDownIcon = () => svgWrap(<path d="M7 5 L12 12 L17 5" />);
+
+
+function StatBarRow({ label, pct, color, value }: { label: string; pct: number; color: string; value: string }) {
+  return (
+    <div className="stat-bar-row">
+      <span className="stat-bar-label">{label}</span>
+      <span className="stat-bar-track"><span style={{ width: Math.max(2, Math.min(100, pct)) + '%', background: color }} /></span>
+      <span className="stat-bar-val">{value}</span>
+    </div>
+  );
+}
+
+function SavingsCard({ icon, iconClass, title, value, valueColor, income, expense }:
+  { icon: ReactNode; iconClass: string; title: string; value: string; valueColor: string; income: number; expense: number }) {
+  const total = income + expense;
+  const incPct = total > 0 ? Math.round((income / total) * 100) : 0;
+  const expPct = total > 0 ? Math.round((expense / total) * 100) : 0;
+  return (
+    <div className="stat sav">
+      <div className="stat-head"><span className={"stat-icon " + iconClass}>{icon}</span><span className="label">{title}</span></div>
+      <div className="value" style={{ color: valueColor }}>{value}</div>
+      <div className="stat-divider" />
+      <div className="stat-ie">
+        <div className="ie-cell"><span className="ie-badge up">{ArrowUpIcon()}</span>INCOME<div className="ie-val">{money(income)}</div></div>
+        <div className="ie-cell"><span className="ie-badge down">{ArrowDownIcon()}</span>EXPENSES<div className="ie-val">{money(expense)}</div></div>
+      </div>
+      <StatBarRow label="Income" pct={incPct} color="#34d399" value={money(income)} />
+      <StatBarRow label="Expenses" pct={expPct} color="#ef4444" value={money(expense)} />
+    </div>
+  );
 }
 
 function Bar({ label, amount, max, colorClass, credit }: { label: string; amount: number; max: number; colorClass?: string; credit?: boolean }) {
@@ -202,46 +246,26 @@ export default function Reports() {
           <div className="stat-row" style={{ marginTop: 14 }}>
             {(() => {
               const monthNet = data.totals.income - data.totals.expense;
-              const mInc = data.totals.income, mExp = data.totals.expense;
-              const incPct = mInc + mExp > 0 ? Math.round((mInc / (mInc + mExp)) * 100) : 0;
-              const expPct = mInc + mExp > 0 ? Math.round((mExp / (mInc + mExp)) * 100) : 0;
-              return (
-                <div className="stat sav">
-                  <div className="stat-head"><span className="stat-icon ic-green">🐷</span><span className="label">{monthLabel.toUpperCase()} SAVINGS</span></div>
-                  <div className="value" style={{ color: monthNet < 0 ? '#ef4444' : '#34d399' }}>{money(monthNet)}</div>
-                  <div className="stat-split">
-                    <div className="split-row"><span className="dot up">▲</span>Income <strong style={{ color: '#34d399' }}>{money(mInc)}</strong></div>
-                    <div className="split-row"><span className="dot down">▼</span>Expenses <strong style={{ color: '#ef4444' }}>{money(mExp)}</strong></div>
-                    <div className="split-bars"><div className="sb inc" style={{ width: incPct + '%' }} /><div className="sb exp" style={{ width: expPct + '%' }} /></div>
-                  </div>
-                </div>
-              );
+              return <SavingsCard icon={<PiggyIcon />} iconClass="ic-green" title={(monthLabel + ' SAVINGS').toUpperCase()}
+                value={money(monthNet)} valueColor={monthNet < 0 ? '#ef4444' : '#34d399'}
+                income={data.totals.income} expense={data.totals.expense} />;
             })()}
             {(() => {
               const yNet = data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0);
               const yInc = data.yearlyTrend.reduce((s, m) => s + m.income, 0);
               const yExp = data.yearlyTrend.reduce((s, m) => s + m.expense, 0);
-              const incPct = yInc + yExp > 0 ? Math.round((yInc / (yInc + yExp)) * 100) : 0;
-              const expPct = yInc + yExp > 0 ? Math.round((yExp / (yInc + yExp)) * 100) : 0;
-              return (
-                <div className="stat sav">
-                  <div className="stat-head"><span className="stat-icon ic-blue">📅</span><span className="label">{year} SAVINGS</span></div>
-                  <div className="value" style={{ color: yNet < 0 ? '#ef4444' : '#34d399' }}>{money(yNet)}</div>
-                  <div className="stat-split">
-                    <div className="split-row"><span className="dot up">▲</span>Income <strong style={{ color: '#34d399' }}>{money(yInc)}</strong></div>
-                    <div className="split-row"><span className="dot down">▼</span>Expenses <strong style={{ color: '#ef4444' }}>{money(yExp)}</strong></div>
-                    <div className="split-bars"><div className="sb inc" style={{ width: incPct + '%' }} /><div className="sb exp" style={{ width: expPct + '%' }} /></div>
-                  </div>
-                </div>
-              );
+              return <SavingsCard icon={<CalendarIcon />} iconClass="ic-blue" title={year + ' SAVINGS'}
+                value={money(yNet)} valueColor={yNet < 0 ? '#ef4444' : '#34d399'} income={yInc} expense={yExp} />;
             })()}
             {(() => {
               const budgetTotal = budgetData.filter((b) => b.kind === 'limit' && !b.subcategoryId).reduce((sum, b) => sum + (b.period === 'yearly' ? Math.round(b.amount / 12) : b.amount), 0);
               return (
                 <div className="stat sav">
-                  <div className="stat-head"><span className="stat-icon ic-gray">👛</span><span className="label">MONTHLY BUDGET TOTAL</span></div>
+                  <div className="stat-head"><span className="stat-icon ic-gray"><WalletIcon /></span><span className="label">MONTHLY BUDGET TOTAL</span></div>
                   <div className="value">{money(budgetTotal)}</div>
-                  <div className="stat-caption">Projected monthly spending from category budgets.</div>
+                  <div className="stat-divider" />
+                  <div className="stat-track-status"><span className="ie-badge target">{TargetIcon()}</span><span style={{ color: '#34d399' }}>On track</span></div>
+                  <div className="stat-caption">vs. monthly budget</div>
                 </div>
               );
             })()}
