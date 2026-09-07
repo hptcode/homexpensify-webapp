@@ -46,7 +46,10 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 function money(cents: number): string {
   const sign = cents < 0 ? '-' : '';
-  return sign + '$' + (Math.abs(cents) / 100).toFixed(2);
+  const amt = Math.abs(cents) / 100;
+  const [whole, dec] = amt.toFixed(2).split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + '$' + grouped + '.' + dec;
 }
 
 function Bar({ label, amount, max, colorClass, credit }: { label: string; amount: number; max: number; colorClass?: string; credit?: boolean }) {
@@ -197,20 +200,51 @@ export default function Reports() {
       {data && (
         <>
           <div className="stat-row" style={{ marginTop: 14 }}>
-            <div className="stat total" style={{ background: (data.totals.income - data.totals.expense) < 0 ? "var(--danger)" : undefined }}>
-              <div className="label">{monthLabel.toUpperCase()} SAVINGS</div>
-              <div className="value">{money(data.totals.income - data.totals.expense)}</div>
-              <div className="stat-caption"><span style={{ color: '#ef4444' }}>exp {money(data.totals.expense)}</span>&nbsp;·&nbsp;<span style={{ color: '#16a34a' }}>inc {money(data.totals.income)}</span></div>
-            </div>
-            <div className="stat total" style={{ background: (data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0)) < 0 ? "var(--danger)" : undefined }}>
-              <div className="label">{year} SAVINGS</div>
-              <div className="value">{money(data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0))}</div>
-              <div className="stat-caption"><span style={{ color: '#ef4444' }}>exp {money(data.yearlyTrend.reduce((s, m) => s + m.expense, 0))}</span>&nbsp;·&nbsp;<span style={{ color: '#16a34a' }}>inc {money(data.yearlyTrend.reduce((s, m) => s + m.income, 0))}</span></div>
-            </div>
-            <div className="stat">
-              <div className="label">Monthly Budget Total</div>
-              <div className="value">{money(budgetData.filter((b) => b.kind === 'limit' && !b.subcategoryId).reduce((sum, b) => sum + (b.period === 'yearly' ? Math.round(b.amount / 12) : b.amount), 0))}</div>
-            </div>
+            {(() => {
+              const monthNet = data.totals.income - data.totals.expense;
+              const mInc = data.totals.income, mExp = data.totals.expense;
+              const incPct = mInc + mExp > 0 ? Math.round((mInc / (mInc + mExp)) * 100) : 0;
+              const expPct = mInc + mExp > 0 ? Math.round((mExp / (mInc + mExp)) * 100) : 0;
+              return (
+                <div className="stat sav">
+                  <div className="stat-head"><span className="stat-icon ic-green">🐷</span><span className="label">{monthLabel.toUpperCase()} SAVINGS</span></div>
+                  <div className="value" style={{ color: monthNet < 0 ? '#ef4444' : '#34d399' }}>{money(monthNet)}</div>
+                  <div className="stat-split">
+                    <div className="split-row"><span className="dot up">▲</span>Income <strong style={{ color: '#34d399' }}>{money(mInc)}</strong></div>
+                    <div className="split-row"><span className="dot down">▼</span>Expenses <strong style={{ color: '#ef4444' }}>{money(mExp)}</strong></div>
+                    <div className="split-bars"><div className="sb inc" style={{ width: incPct + '%' }} /><div className="sb exp" style={{ width: expPct + '%' }} /></div>
+                  </div>
+                </div>
+              );
+            })()}
+            {(() => {
+              const yNet = data.yearlyTrend.reduce((s, m) => s + (m.income - m.expense), 0);
+              const yInc = data.yearlyTrend.reduce((s, m) => s + m.income, 0);
+              const yExp = data.yearlyTrend.reduce((s, m) => s + m.expense, 0);
+              const incPct = yInc + yExp > 0 ? Math.round((yInc / (yInc + yExp)) * 100) : 0;
+              const expPct = yInc + yExp > 0 ? Math.round((yExp / (yInc + yExp)) * 100) : 0;
+              return (
+                <div className="stat sav">
+                  <div className="stat-head"><span className="stat-icon ic-blue">📅</span><span className="label">{year} SAVINGS</span></div>
+                  <div className="value" style={{ color: yNet < 0 ? '#ef4444' : '#34d399' }}>{money(yNet)}</div>
+                  <div className="stat-split">
+                    <div className="split-row"><span className="dot up">▲</span>Income <strong style={{ color: '#34d399' }}>{money(yInc)}</strong></div>
+                    <div className="split-row"><span className="dot down">▼</span>Expenses <strong style={{ color: '#ef4444' }}>{money(yExp)}</strong></div>
+                    <div className="split-bars"><div className="sb inc" style={{ width: incPct + '%' }} /><div className="sb exp" style={{ width: expPct + '%' }} /></div>
+                  </div>
+                </div>
+              );
+            })()}
+            {(() => {
+              const budgetTotal = budgetData.filter((b) => b.kind === 'limit' && !b.subcategoryId).reduce((sum, b) => sum + (b.period === 'yearly' ? Math.round(b.amount / 12) : b.amount), 0);
+              return (
+                <div className="stat sav">
+                  <div className="stat-head"><span className="stat-icon ic-gray">👛</span><span className="label">MONTHLY BUDGET TOTAL</span></div>
+                  <div className="value">{money(budgetTotal)}</div>
+                  <div className="stat-caption">Projected monthly spending from category budgets.</div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="chart budget-status">

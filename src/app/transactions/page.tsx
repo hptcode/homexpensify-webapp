@@ -25,7 +25,10 @@ function pdtToday(): string {
 }
 function money(cents: number): string {
   const sign = cents < 0 ? '-' : '';
-  return sign + '$' + (Math.abs(cents) / 100).toFixed(2);
+  const amt = Math.abs(cents) / 100;
+  const [whole, dec] = amt.toFixed(2).split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return sign + '$' + grouped + '.' + dec;
 }
 function fmtDate(iso: string): string {
   const ymd = (iso || '').slice(0, 10);
