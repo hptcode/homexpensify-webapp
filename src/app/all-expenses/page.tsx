@@ -1,6 +1,9 @@
 // Client component: every transaction LINE for a selected month or whole year.
 // Defaults to the current month (PDT). Each row has Edit (opens Add Expense pre-filled)
 // and Delete (removes the whole transaction from the DB).
+// "Total" mode: instead of line entries, show grouped totals of the filtered
+// selections — specific subcategory/merchant → one total row; no filter →
+// per-category totals; whole year → per-month totals.
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -44,6 +47,7 @@ export default function AllExpenses() {
   const [catFilter, setCatFilter] = useState('');
   const [subFilter, setSubFilter] = useState('');
   const [merchantFilter, setMerchantFilter] = useState('');
+  const [totalMode, setTotalMode] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -81,6 +85,53 @@ export default function AllExpenses() {
   const totalIncByCat = incomeRows.reduce((s, r) => s + (r.direction === 'income' ? r.amount : -r.amount), 0);
   // Helper: show correct sign based on effective direction (refund subcategories = credit in expense section)
   const sign = (r: any) => r.direction === 'income' ? '+' : '-';
+  // Signed cents per line — expense-category items add (positive = spend), refunds
+  // go negative; income mirror-image. Keeps refund/credit conventions consistent.
+  const eff = (r: Row) => r.categoryDirection === 'expense'
+    ? (r.direction === 'expense' ? r.amount : -r.amount)
+    : (r.direction === 'income' ? r.amount : -r.amount);
+  const signedSum = (rs: Row[]) => rs.reduce((s, r) => s + eff(r), 0);
+
+  // ---- Total (grouped) mode ----
+  type SumRow = { label: string; cents: number; isExpenseSection: boolean };
+  let expSummary: SumRow[] = [];
+  let incSummary: SumRow[] = [];
+  if (totalMode) {
+    if (!month) {
+      // Whole year: one row per month of the filtered selections
+      const byMonthE = new Map<number, number>();
+      const byMonthI = new Map<number, number>();
+      for (const r of filtered) {
+        const m = Number((r.transactedAt || '').slice(5, 7));
+        const map = r.categoryDirection === 'expense' ? byMonthE : byMonthI;
+        map.set(m, (map.get(m) || 0) + eff(r));
+      }
+      expSummary = [...byMonthE].sort((a, b) => a[0] - b[0]).map(([m, c]) => ({ label: MONTHS[m - 1], cents: c, isExpenseSection: true }));
+      incSummary = [...byMonthI].sort((a, b) => a[0] - b[0]).map(([m, c]) => ({ label: MONTHS[m - 1], cents: c, isExpenseSection: false }));
+    } else if (subFilter || merchantFilter) {
+      // Specific filter selected: one total row for that selection
+      const label = subFilter ? `Subcategory: ${subFilter}` : `Merchant: ${merchantFilter}`;
+      const expRows = filtered.filter((r) => r.categoryDirection === 'expense');
+      const incRows = filtered.filter((r) => r.categoryDirection === 'income');
+      if (expRows.length > 0) expSummary = [{ label, cents: signedSum(expRows), isExpenseSection: true }];
+      if (incRows.length > 0) incSummary = [{ label, cents: signedSum(incRows), isExpenseSection: false }];
+    } else {
+      // No specific filter: one total row per category
+      const byCat = new Map<string, number>();
+      const dirOf = new Map<string, string>();
+      for (const r of filtered) {
+        byCat.set(r.category, (byCat.get(r.category) || 0) + eff(r));
+        dirOf.set(r.category, r.categoryDirection);
+      }
+      expSummary = [...byCat].filter(([c]) => dirOf.get(c) === 'expense').sort((a, b) => a[0].localeCompare(b[0])).map(([c, cents]) => ({ label: c, cents, isExpenseSection: true }));
+      incSummary = [...byCat].filter(([c]) => dirOf.get(c) === 'income').sort((a, b) => a[0].localeCompare(b[0])).map(([c, cents]) => ({ label: c, cents, isExpenseSection: false }));
+    }
+  }
+  // Display sign follows effective direction, matching the detail tables:
+  // expense section: spend '-', refund '+'; income section: '+', payout '-'.
+  const sumSign = (s: SumRow) => (s.cents < 0 ? (s.isExpenseSection ? '+' : '-') : (s.isExpenseSection ? '-' : '+'));
+  const sumLabelHeader = !totalMode ? 'Date' : (!month ? 'Month' : 'Category');
+  const sumSecondHeader = !totalMode ? 'Merchant' : (subFilter ? 'Subcategory' : merchantFilter ? 'Merchant' : 'Total');
   const years = Array.from({ length: 10 }, (_, i) => now.getUTCFullYear() - 4 + i);
 
   return (
@@ -122,6 +173,10 @@ export default function AllExpenses() {
               {[...new Set(rows.map((r) => r.merchant || '-'))].sort().map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={totalMode} onChange={(e) => setTotalMode(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />
+            <span style={{ fontWeight: 600 }}>Total</span>
+          </label>
         </div>
         {error && <p className="error">{error}</p>}
         <div style={{ marginTop: 14, display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
@@ -138,17 +193,23 @@ export default function AllExpenses() {
       </div>
 
       <div className="card wide" style={{ marginTop: 14 }}>
-        <h3 style={{ marginTop: 0 }}>Expenses</h3>
-        {expenseRows.length === 0 && <p className="muted">No expenses for this period.</p>}
-        {expenseRows.length > 0 && (
+        <h3 style={{ marginTop: 0 }}>{totalMode ? 'Expenses (totals)' : 'Expenses'}</h3>
+        {!totalMode && expenseRows.length === 0 && <p className="muted">No expenses for this period.</p>}
+        {totalMode && expSummary.length === 0 && <p className="muted">No expense totals for this period.</p>}
+        {(!totalMode ? expenseRows.length > 0 : expSummary.length > 0) && (
           <table className="exp-table">
             <thead>
               <tr>
-                <th>Date</th><th>Merchant</th><th>Category</th><th>Subcategory</th><th style={{ textAlign: 'right' }}>Amount</th><th></th>
+                <th>{sumLabelHeader}</th>
+                {totalMode && subFilter && <th>Subcategory</th>}
+                {totalMode && merchantFilter && <th>Merchant</th>}
+                {!totalMode && <><th>Merchant</th><th>Category</th><th>Subcategory</th></>}
+                <th style={{ textAlign: 'right' }}>{totalMode ? 'Total' : 'Amount'}</th>
+                {!totalMode && <th></th>}
               </tr>
             </thead>
             <tbody>
-              {expenseRows.map((r) => (
+              {!totalMode && expenseRows.map((r) => (
                 <tr key={r.id}>
                   <td>{fmtDate(r.transactedAt)}</td>
                   <td>{r.merchant || '—'}</td>
@@ -161,23 +222,37 @@ export default function AllExpenses() {
                   </td>
                 </tr>
               ))}
+              {totalMode && expSummary.map((s) => (
+                <tr key={s.label}>
+                  <td>{s.label}</td>
+                  {subFilter && <td>{subFilter}</td>}
+                  {merchantFilter && <td>{merchantFilter}</td>}
+                  <td style={{ textAlign: 'right' }}>{sumSign(s)}{money(s.cents)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
       </div>
 
       <div className="card wide" style={{ marginTop: 14 }}>
-        <h3 style={{ marginTop: 0 }}>Income</h3>
-        {incomeRows.length === 0 && <p className="muted">No income entries for this period.</p>}
-        {incomeRows.length > 0 && (
+        <h3 style={{ marginTop: 0 }}>{totalMode ? 'Income (totals)' : 'Income'}</h3>
+        {!totalMode && incomeRows.length === 0 && <p className="muted">No income entries for this period.</p>}
+        {totalMode && incSummary.length === 0 && <p className="muted">No income totals for this period.</p>}
+        {(!totalMode ? incomeRows.length > 0 : incSummary.length > 0) && (
           <table className="exp-table">
             <thead>
               <tr>
-                <th>Date</th><th>Merchant</th><th>Category</th><th>Subcategory</th><th style={{ textAlign: 'right' }}>Amount</th><th></th>
+                <th>{sumLabelHeader}</th>
+                {totalMode && subFilter && <th>Subcategory</th>}
+                {totalMode && merchantFilter && <th>Merchant</th>}
+                {!totalMode && <><th>Merchant</th><th>Category</th><th>Subcategory</th></>}
+                <th style={{ textAlign: 'right', color: '#2563eb' }}>{totalMode ? 'Total' : 'Amount'}</th>
+                {!totalMode && <th></th>}
               </tr>
             </thead>
             <tbody>
-              {incomeRows.map((r) => (
+              {!totalMode && incomeRows.map((r) => (
                 <tr key={r.id}>
                   <td>{fmtDate(r.transactedAt)}</td>
                   <td>{r.merchant || '—'}</td>
@@ -188,6 +263,14 @@ export default function AllExpenses() {
                     <button className="btn" onClick={() => editRow(r)}>Edit</button>
                     <button className="btn secondary" onClick={() => deleteRow(r)}>Delete</button>
                   </td>
+                </tr>
+              ))}
+              {totalMode && incSummary.map((s) => (
+                <tr key={s.label}>
+                  <td>{s.label}</td>
+                  {subFilter && <td>{subFilter}</td>}
+                  {merchantFilter && <td>{merchantFilter}</td>}
+                  <td style={{ textAlign: 'right', color: '#2563eb' }}>{sumSign(s)}{money(s.cents)}</td>
                 </tr>
               ))}
             </tbody>
