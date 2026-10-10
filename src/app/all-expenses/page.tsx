@@ -109,8 +109,8 @@ export default function AllExpenses() {
         const map = r.categoryDirection === 'expense' ? byMerchantE : byMerchantI;
         map.set(key, (map.get(key) || 0) + eff(r));
       }
-      expSummary = [...byMerchantE].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: true }));
-      incSummary = [...byMerchantI].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: false }));
+      expSummary = [...byMerchantE].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: true }));
+      incSummary = [...byMerchantI].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: false }));
     } else if (!month) {
       // Whole year (By Merchant unchecked): one row per month of the filtered selections
       const byMonthE = new Map<number, number>();
