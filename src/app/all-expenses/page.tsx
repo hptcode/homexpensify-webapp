@@ -48,6 +48,7 @@ export default function AllExpenses() {
   const [subFilter, setSubFilter] = useState('');
   const [merchantFilter, setMerchantFilter] = useState('');
   const [totalMode, setTotalMode] = useState(false);
+  const [byMerchant, setByMerchant] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -109,12 +110,25 @@ export default function AllExpenses() {
       expSummary = [...byMonthE].sort((a, b) => a[0] - b[0]).map(([m, c]) => ({ label: MONTHS[m - 1], cents: c, isExpenseSection: true }));
       incSummary = [...byMonthI].sort((a, b) => a[0] - b[0]).map(([m, c]) => ({ label: MONTHS[m - 1], cents: c, isExpenseSection: false }));
     } else if (subFilter || merchantFilter) {
-      // Specific filter selected: one total row for that selection
-      const label = subFilter ? `Subcategory: ${subFilter}` : `Merchant: ${merchantFilter}`;
+      // Specific filter selected
       const expRows = filtered.filter((r) => r.categoryDirection === 'expense');
       const incRows = filtered.filter((r) => r.categoryDirection === 'income');
-      if (expRows.length > 0) expSummary = [{ label, cents: signedSum(expRows), isExpenseSection: true }];
-      if (incRows.length > 0) incSummary = [{ label, cents: signedSum(incRows), isExpenseSection: false }];
+      if (byMerchant && (subFilter || catFilter) && !merchantFilter) {
+        // Per-merchant breakdown of the selected category/subcategory
+        const byMerchantE = new Map<string, number>();
+        const byMerchantI = new Map<string, number>();
+        for (const r of filtered) {
+          const key = r.merchant || '-';
+          const map = r.categoryDirection === 'expense' ? byMerchantE : byMerchantI;
+          map.set(key, (map.get(key) || 0) + eff(r));
+        }
+        expSummary = [...byMerchantE].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: true }));
+        incSummary = [...byMerchantI].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: false }));
+      } else {
+        const label = subFilter ? `Subcategory: ${subFilter}` : `Merchant: ${merchantFilter}`;
+        if (expRows.length > 0) expSummary = [{ label, cents: signedSum(expRows), isExpenseSection: true }];
+        if (incRows.length > 0) incSummary = [{ label, cents: signedSum(incRows), isExpenseSection: false }];
+      }
     } else {
       // No specific filter: one total row per category
       const byCat = new Map<string, number>();
@@ -130,7 +144,8 @@ export default function AllExpenses() {
   // Display sign follows effective direction, matching the detail tables:
   // expense section: spend '-', refund '+'; income section: '+', payout '-'.
   const sumSign = (s: SumRow) => (s.cents < 0 ? (s.isExpenseSection ? '+' : '-') : (s.isExpenseSection ? '-' : '+'));
-  const sumLabelHeader = !totalMode ? 'Date' : (!month ? 'Month' : 'Category');
+  const byMerchantActive = totalMode && byMerchant && (subFilter || catFilter) && !merchantFilter && !!month;
+  const sumLabelHeader = !totalMode ? 'Date' : (byMerchantActive ? 'Merchant' : (!month ? 'Month' : 'Category'));
   const sumSecondHeader = !totalMode ? 'Merchant' : (subFilter ? 'Subcategory' : merchantFilter ? 'Merchant' : 'Total');
   const years = Array.from({ length: 10 }, (_, i) => now.getUTCFullYear() - 4 + i);
 
@@ -177,6 +192,12 @@ export default function AllExpenses() {
             <input type="checkbox" checked={totalMode} onChange={(e) => setTotalMode(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />
             <span style={{ fontWeight: 600 }}>Total</span>
           </label>
+          {totalMode && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 10, cursor: (subFilter || catFilter) ? 'pointer' : 'not-allowed', opacity: (subFilter || catFilter) ? 1 : 0.45 }} title="Break the total down per merchant — requires a category or subcategory filter and All merchants">
+              <input type="checkbox" checked={byMerchant} onChange={(e) => setByMerchant(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)' }} />
+              <span style={{ fontWeight: 600 }}>By merchant</span>
+            </label>
+          )}
         </div>
         {error && <p className="error">{error}</p>}
         <div style={{ marginTop: 14, display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
