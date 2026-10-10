@@ -98,8 +98,21 @@ export default function AllExpenses() {
   let expSummary: SumRow[] = [];
   let incSummary: SumRow[] = [];
   if (totalMode) {
-    if (!month) {
-      // Whole year: one row per month of the filtered selections
+    // Per-merchant breakdown takes top precedence (category or subcategory filter, All merchants)
+    const breakdown = byMerchant && (subFilter || catFilter) && !merchantFilter;
+    if (breakdown) {
+      // Per-merchant breakdown of the selected category/subcategory
+      const byMerchantE = new Map<string, number>();
+      const byMerchantI = new Map<string, number>();
+      for (const r of filtered) {
+        const key = r.merchant || '-';
+        const map = r.categoryDirection === 'expense' ? byMerchantE : byMerchantI;
+        map.set(key, (map.get(key) || 0) + eff(r));
+      }
+      expSummary = [...byMerchantE].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: true }));
+      incSummary = [...byMerchantI].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: false }));
+    } else if (!month) {
+      // Whole year (By Merchant unchecked): one row per month of the filtered selections
       const byMonthE = new Map<number, number>();
       const byMonthI = new Map<number, number>();
       for (const r of filtered) {
@@ -113,22 +126,9 @@ export default function AllExpenses() {
       // Specific filter selected
       const expRows = filtered.filter((r) => r.categoryDirection === 'expense');
       const incRows = filtered.filter((r) => r.categoryDirection === 'income');
-      if (byMerchant && (subFilter || catFilter) && !merchantFilter) {
-        // Per-merchant breakdown of the selected category/subcategory
-        const byMerchantE = new Map<string, number>();
-        const byMerchantI = new Map<string, number>();
-        for (const r of filtered) {
-          const key = r.merchant || '-';
-          const map = r.categoryDirection === 'expense' ? byMerchantE : byMerchantI;
-          map.set(key, (map.get(key) || 0) + eff(r));
-        }
-        expSummary = [...byMerchantE].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: true }));
-        incSummary = [...byMerchantI].sort((a, b) => a[0].localeCompare(b[0])).map(([k, cents]) => ({ label: k, cents, isExpenseSection: false }));
-      } else {
-        const label = subFilter ? `Subcategory: ${subFilter}` : `Merchant: ${merchantFilter}`;
-        if (expRows.length > 0) expSummary = [{ label, cents: signedSum(expRows), isExpenseSection: true }];
-        if (incRows.length > 0) incSummary = [{ label, cents: signedSum(incRows), isExpenseSection: false }];
-      }
+      const label = subFilter ? `Subcategory: ${subFilter}` : `Merchant: ${merchantFilter}`;
+      if (expRows.length > 0) expSummary = [{ label, cents: signedSum(expRows), isExpenseSection: true }];
+      if (incRows.length > 0) incSummary = [{ label, cents: signedSum(incRows), isExpenseSection: false }];
     } else {
       // No specific filter: one total row per category
       const byCat = new Map<string, number>();
@@ -144,7 +144,7 @@ export default function AllExpenses() {
   // Display sign follows effective direction, matching the detail tables:
   // expense section: spend '-', refund '+'; income section: '+', payout '-'.
   const sumSign = (s: SumRow) => (s.cents < 0 ? (s.isExpenseSection ? '+' : '-') : (s.isExpenseSection ? '-' : '+'));
-  const byMerchantActive = totalMode && byMerchant && (subFilter || catFilter) && !merchantFilter && !!month;
+  const byMerchantActive = totalMode && byMerchant && (subFilter || catFilter) && !merchantFilter;
   const sumLabelHeader = !totalMode ? 'Date' : (byMerchantActive ? 'Merchant' : (!month ? 'Month' : 'Category'));
   const sumSecondHeader = !totalMode ? 'Merchant' : (subFilter ? 'Subcategory' : merchantFilter ? 'Merchant' : 'Total');
   const years = Array.from({ length: 10 }, (_, i) => now.getUTCFullYear() - 4 + i);
